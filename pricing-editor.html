@@ -1,0 +1,1896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pricing Editor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <style>
+        .rule-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f8f9fa;
+        }
+        .rule-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .percentage-input {
+            width: 100px;
+        }
+        .matching-items-grid {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .sub-rule {
+            margin-left: 30px;
+            border-left: 3px solid #ddd;
+            padding: 15px 0 0 15px;
+            margin-top: 10px;
+        }
+        .add-sub-rule-btn {
+            margin-left: 10px;
+        }
+        .rule-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .vendor-discount-display {
+            background-color: #e9ecef;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .rule-match {
+            background-color: #fff3cd !important;
+        }
+        .pagination {
+            margin-bottom: 0;
+        }
+        .rule-conditions {
+            margin-bottom: 15px;
+        }
+        .rule-condition {
+            margin-bottom: 10px;
+        }
+        .main-condition {
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 15px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Pricing Editor</h2>
+            <div>
+                <button class="btn btn-primary me-2" id="saveRulesBtn">Save Rules</button>
+                <button class="btn btn-success" id="exportExcelBtn">Export All Rules to Excel</button>
+            </div>
+        </div>
+        
+        <!-- Notes Section -->
+        <div class="alert alert-info mb-4">
+            <h5 class="alert-heading">Important Notes</h5>
+            <p class="mb-2">Backend Credit Reporting needs to use values at time of sale, not current values. All data required for backend credits must be stored at the Order Item level and not called from the Item Level.</p>
+            <p class="mb-0">Vendor List Should Include All Vendors in our system.</p>
+        </div>
+        
+        <!-- Vendor Summary Grid -->
+        <div class="card mb-4" id="vendorSummaryCard" style="display: none;">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">Vendor Summary</h4>
+                <button class="btn btn-outline-secondary btn-sm" id="hideVendorSummary">
+                    <i class="bi bi-chevron-up"></i> Hide
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Vendor Name</th>
+                                <th>Default %</th>
+                                <th># of Rules</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vendorSummaryTable">
+                            <!-- Vendors will be populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Show Vendor Summary Button -->
+        <div class="mb-4">
+            <button class="btn btn-outline-primary" id="showVendorSummary">
+                <i class="bi bi-chevron-down"></i> Show Vendor Summary
+            </button>
+        </div>
+        
+        <!-- Vendor Selection -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4>Select Vendor</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="vendorSelect" class="form-label">Vendor</label>
+                            <select class="form-select" id="vendorSelect">
+                                <option value="">Select a vendor...</option>
+                                <!-- Vendors will be populated dynamically -->
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Vendor Default Section -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4>Vendor Default Percentage</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="vendorDefault" class="form-label">Default Percentage</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control percentage-input" id="vendorDefault" min="0" max="100" step="0.01">
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rules Section -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4>Pricing Rules</h4>
+                <button class="btn btn-primary" id="addRuleBtn">Add New Rule</button>
+            </div>
+            <div class="card-body">
+                <div id="rulesContainer">
+                    <!-- Rules will be added here dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rule Template (Hidden) -->
+    <template id="ruleTemplate">
+        <div class="rule-card">
+            <div class="rule-header">
+                <h5>New Rule</h5>
+                <div class="rule-actions">
+                    <button class="btn btn-success btn-sm add-sub-rule-btn">
+                        <i class="bi bi-plus-lg"></i> Add Condition
+                    </button>
+                    <button class="btn btn-danger btn-sm delete-rule">Delete</button>
+                </div>
+            </div>
+            <div class="rule-conditions">
+                <!-- Main condition -->
+                <div class="rule-condition main-condition">
+                    <div class="row">
+                        <div class="col-md-5">
+                            <div class="mb-3">
+                                <label class="form-label">Category</label>
+                                <select class="form-select category-select">
+                                    <option value="author">Author</option>
+                                    <option value="bible_translations">Bible Translations</option>
+                                    <option value="bible_version">Bible Version</option>
+                                    <option value="catalog_sections">Catalog Sections</option>
+                                    <option value="categories">Categories</option>
+                                    <option value="isbn_13">ISBN-13</option>
+                                    <option value="item_seq_id">Item_Seq_ID</option>
+                                    <option value="item_type">Item Type</option>
+                                    <option value="publisher">Publisher</option>
+                                    <option value="special">Special</option>
+                                    <option value="speedy">Speedy</option>
+                                    <option value="title_keywords">Title Key Words</option>
+                                    <option value="upc">UPC</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-7">
+                            <div class="mb-3">
+                                <label class="form-label">Value</label>
+                                <input type="text" class="form-control value-input">
+                                <select class="form-select publisher-select d-none">
+                                    <!-- Publishers will be populated dynamically -->
+                                </select>
+                                <select class="form-select special-select d-none">
+                                    <option value="">Select a special type...</option>
+                                    <option value="print_on_demand">Print On Demand</option>
+                                </select>
+                                <div class="publisher-discount-display d-none mt-2">
+                                    <small class="text-muted">Current Publisher Buy Discount: <span class="discount-value">0%</span></small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Rule settings -->
+            <div class="rule-settings mt-4">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <label class="form-label">Percentage Type</label>
+                            <select class="form-select percentage-type">
+                                <option value="flat">Flat Percentage</option>
+                                <option value="additive_vendor">Add Percentage to Vendor Buy Discount</option>
+                                <option value="additive_publisher">Add Percentage to Publisher Buy Discount</option>
+                                <option value="retail_extension">% of Retail Price Extension</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <label class="form-label">Percentage</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control percentage-input" min="0" max="100" step="0.01">
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Start Date</label>
+                            <input type="date" class="form-control start-date">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">End Date</label>
+                            <input type="date" class="form-control end-date">
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="mb-3">
+                            <label class="form-label">Current Vendor Buy Discount</label>
+                            <div class="vendor-discount-display">0%</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <button class="btn btn-info btn-sm view-matching-items">View items that could fit this rule</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="subRuleTemplate">
+        <div class="sub-rule">
+            <div class="row align-items-end">
+                <div class="col-md-3">
+                    <div class="mb-3">
+                        <label class="form-label">Operator</label>
+                        <select class="form-select operator-select">
+                            <option value="AND">AND</option>
+                            <option value="OR">OR</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label">Category</label>
+                        <select class="form-select category-select">
+                            <option value="author">Author</option>
+                            <option value="bible_translations">Bible Translations</option>
+                            <option value="bible_version">Bible Version</option>
+                            <option value="catalog_sections">Catalog Sections</option>
+                            <option value="categories">Categories</option>
+                            <option value="isbn_13">ISBN-13</option>
+                            <option value="item_seq_id">Item_Seq_ID</option>
+                            <option value="item_type">Item Type</option>
+                            <option value="publisher">Publisher</option>
+                            <option value="special">Special</option>
+                            <option value="speedy">Speedy</option>
+                            <option value="title_keywords">Title Key Words</option>
+                            <option value="upc">UPC</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label">Value</label>
+                        <input type="text" class="form-control value-input">
+                        <select class="form-select publisher-select d-none">
+                            <!-- Publishers will be populated dynamically -->
+                        </select>
+                        <select class="form-select special-select d-none">
+                            <option value="">Select a special type...</option>
+                            <option value="print_on_demand">Print On Demand</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-1">
+                    <div class="mb-3">
+                        <button class="btn btn-danger btn-sm delete-sub-rule">×</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Matching Items Modal -->
+    <div class="modal fade" id="matchingItemsModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Matching Items</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-search"></i></span>
+                            <input type="text" class="form-control" id="matchingItemsSearch" placeholder="Search items...">
+                        </div>
+                    </div>
+                    <div class="matching-items-grid">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Item_Seq_ID</th>
+                                    <th>Title</th>
+                                    <th>Category</th>
+                                    <th>Type</th>
+                                    <th>Speedy</th>
+                                    <th>ISBN-13</th>
+                                    <th>UPC</th>
+                                    <th>Current Price</th>
+                                    <th>Matching Rules</th>
+                                </tr>
+                            </thead>
+                            <tbody id="matchingItemsTableBody">
+                                <!-- Items will be populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <nav aria-label="Page navigation" class="mt-3">
+                        <ul class="pagination justify-content-center" id="matchingItemsPagination">
+                            <!-- Pagination will be added dynamically -->
+                        </ul>
+                    </nav>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Version History Section -->
+    <div class="position-fixed bottom-0 end-0 m-3">
+        <button class="btn btn-outline-secondary" id="showVersionHistory">
+            <i class="bi bi-clock-history"></i> Version History
+        </button>
+    </div>
+
+    <div class="modal fade" id="versionHistoryModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Version History</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <h6>Today's Changes (2024-03-22)</h6>
+                    <ul class="list-group mb-4">
+                        <li class="list-group-item">Added hierarchical rule conditions with AND/OR operators</li>
+                        <li class="list-group-item">Improved condition layout with clear visual hierarchy</li>
+                        <li class="list-group-item">Added "Add Condition" button for creating complex rules</li>
+                        <li class="list-group-item">Redesigned rule card layout for better readability</li>
+                        <li class="list-group-item">Separated main condition from sub-conditions visually</li>
+                    </ul>
+
+                    <h6>Previous Changes (2024-03-21)</h6>
+                    <ul class="list-group">
+                        <li class="list-group-item">Added vendor summary grid with default percentages and rule counts</li>
+                        <li class="list-group-item">Added toggle button to show/hide vendor summary grid</li>
+                        <li class="list-group-item">Alphabetized vendor list in dropdown</li>
+                        <li class="list-group-item">Alphabetized category options in dropdown</li>
+                        <li class="list-group-item">Added publisher dropdown and current publisher buy discount display</li>
+                        <li class="list-group-item">Modified save rules to not download anything, only show success message</li>
+                        <li class="list-group-item">Added important notes section about backend credit reporting</li>
+                        <li class="list-group-item">Added note about including all vendors in the system</li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const addRuleBtn = document.getElementById('addRuleBtn');
+            const rulesContainer = document.getElementById('rulesContainer');
+            const ruleTemplate = document.getElementById('ruleTemplate');
+            const vendorSelect = document.getElementById('vendorSelect');
+            const matchingItemsModal = new bootstrap.Modal(document.getElementById('matchingItemsModal'));
+            const matchingItemsTableBody = document.getElementById('matchingItemsTableBody');
+            const exportExcelBtn = document.getElementById('exportExcelBtn');
+            const saveRulesBtn = document.getElementById('saveRulesBtn');
+
+            // Mock vendor data - replace with actual API call
+            const vendors = [
+                { id: 2010054, name: 'ABINGDON PRESS (ABIN)' },
+                { id: 2032332423, name: 'APG SALES & DISTRIBUTION (ASD)' },
+                { id: 2991500, name: 'BAKER PUB GROUP (BAK)' },
+                { id: 2957094, name: 'BARBOUR PUBLISHING (BBU)' },
+                { id: 201937, name: 'B & H PUBLISHING (HOLM)' },
+                { id: 9902635, name: 'BROADSTREET PUB GROUP (BRP)' },
+                { id: 2032332423, name: 'CHOSEN LLC (CHO)' },
+                { id: 6305990240, name: 'CHRISTIAN ART GIFTS (CAG)' },
+                { id: 6775640, name: 'CHARISMA MEDIA (CREA)' },
+                { id: 2117991, name: 'CROSSWAY BOOKS (GNP)' },
+                { id: 2987414, name: 'DAVID C COOK (CHF)' },
+                { id: 2032332423, name: 'DEXSA COMPANY (DEX)' },
+                { id: 6156692695, name: 'DEXTERITY (DXT)' },
+                { id: 2986302, name: 'DAYSPRING CARDS (40 DAYS)' },
+                { id: 2074745, name: 'HARVEST HOUSE (HRVH)' },
+                { id: 2989115, name: 'KREGEL PUBLICATIONS (KRE)' },
+                { id: 2033151, name: 'LONGLEAF SERVICES (LLS)' },
+                { id: 2025604, name: 'MOODY PUBLISHING (MOPR)' },
+                { id: 2079518, name: 'NEW LEAF PRESS (NLEA)' },
+                { id: 3363120230, name: 'NEW GROWTH PRESS (NGP)' },
+                { id: 2032332423, name: 'PAVILION (PAV)' },
+                { id: 2032332423, name: 'THE UPPER ROOM (URB)' },
+                { id: 2549378, name: 'SWANSON (SWA)' },
+                { id: 2067749, name: 'TYNDALE HOUSE (TYND)' },
+                { id: 4423, name: 'WARNER PRESS (WRN)' }
+            ];
+
+            // Sort vendors alphabetically by name
+            vendors.sort((a, b) => a.name.localeCompare(b.name));
+
+            // Populate vendor dropdown
+            vendors.forEach(vendor => {
+                const option = document.createElement('option');
+                option.value = vendor.id;
+                option.textContent = vendor.name;
+                vendorSelect.appendChild(option);
+            });
+
+            // Mock publisher data with random buy discounts
+            const publishers = [
+                { name: 'WARNER PRESS (WRN)', buyDiscount: 55 },
+                { name: 'B & H PUBLISHING (HOLM)', buyDiscount: 60 },
+                { name: 'DAVID C COOK (CHF)', buyDiscount: 51 },
+                { name: 'HARVEST HOUSE (HRVH)', buyDiscount: 65 },
+                { name: 'DAYSPRING CARDS (40 DAYS)', buyDiscount: 70 },
+                { name: 'SWANSON (SWA)', buyDiscount: 45 },
+                { name: 'CHOSEN LLC (CHO)', buyDiscount: 50 },
+                { name: 'PAVILION (PAV)', buyDiscount: 55 },
+                { name: 'DEXSA COMPANY (DEX)', buyDiscount: 40 },
+                { name: 'DEXTERITY (DXT)', buyDiscount: 60 },
+                { name: 'NEW LEAF PRESS (NLEA)', buyDiscount: 55 },
+                { name: 'BARBOUR PUBLISHING (BBU)', buyDiscount: 70 },
+                { name: 'BROADSTREET PUB GROUP (BRP)', buyDiscount: 70 },
+                { name: 'CHRISTIAN ART GIFTS (CAG)', buyDiscount: 70 },
+                { name: 'CROSSWAY BOOKS (GNP)', buyDiscount: 70 },
+                { name: 'BAKER PUB GROUP (BAK)', buyDiscount: 65 },
+                { name: 'TYNDALE HOUSE (TYND)', buyDiscount: 65 },
+                { name: 'CHARISMA MEDIA (CREA)', buyDiscount: 65 },
+                { name: 'APG SALES & DISTRIBUTION (ASD)', buyDiscount: 65 },
+                { name: 'KREGEL PUBLICATIONS (KRE)', buyDiscount: 65 },
+                { name: 'LONGLEAF SERVICES (LLS)', buyDiscount: 65 },
+                { name: 'MOODY PUBLISHING (MOPR)', buyDiscount: 65 },
+                { name: 'NEW GROWTH PRESS (NGP)', buyDiscount: 65 },
+                { name: 'THE UPPER ROOM (URB)', buyDiscount: 65 },
+                { name: 'ABINGDON PRESS (ABIN)', buyDiscount: 62 }
+            ];
+
+            // Preset rules for Warner Press
+            const warnerPressRules = [
+                {
+                    category: 'item_type',
+                    value: 'Books',
+                    percentageType: 'flat',
+                    percentage: 60,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'item_type',
+                    value: 'Boxed Cards',
+                    percentageType: 'flat',
+                    percentage: 72,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'item_type',
+                    value: 'Bulletins',
+                    percentageType: 'flat',
+                    percentage: 62,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'item_type',
+                    value: 'Church Supplies',
+                    percentageType: 'flat',
+                    percentage: 60,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'item_type',
+                    value: 'Offering Envelopes',
+                    percentageType: 'flat',
+                    percentage: 60,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'item_type',
+                    value: 'Curriculum',
+                    percentageType: 'flat',
+                    percentage: 40,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                }
+            ];
+
+            // Preset rules for B&H Publishing
+            const bAndHRules = [
+                {
+                    category: 'publisher',
+                    value: 'B&H Trade',
+                    percentageType: 'additive',
+                    percentage: 10,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'publisher',
+                    value: 'Lifeway Church Resources',
+                    percentageType: 'additive',
+                    percentage: 10,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'item_type',
+                    value: 'Fellowship Cups',
+                    percentageType: 'additive',
+                    percentage: 5,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'item_type',
+                    value: 'Church Supplies',
+                    percentageType: 'flat',
+                    percentage: 0,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31',
+                    note: 'No WA BEC'
+                }
+            ];
+
+            // Preset rules for David C Cook
+            const davidCCookRules = [
+                {
+                    category: 'item_type',
+                    value: 'Books',
+                    percentageType: 'flat',
+                    percentage: 65,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31',
+                    note: 'Everything non-curriculum (normal buy disc = 51% all other titles)'
+                },
+                {
+                    category: 'item_type',
+                    value: 'Quarterly Curriculum',
+                    percentageType: 'flat',
+                    percentage: 60,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31',
+                    note: 'No SLCs (normal buy disc = 40% curriculum)'
+                }
+            ];
+
+            // Preset rules for Harvest House
+            const harvestHouseRules = [
+                {
+                    category: 'bible_version',
+                    value: 'ESV',
+                    percentageType: 'flat',
+                    percentage: 55,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31',
+                    note: 'Inductive Bibles'
+                },
+                {
+                    category: 'bible_version',
+                    value: 'NIV',
+                    percentageType: 'flat',
+                    percentage: 55,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'bible_translations',
+                    value: 'Other',
+                    percentageType: 'flat',
+                    percentage: 65,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31',
+                    note: 'Including The Complete Illustrated Bible'
+                },
+                {
+                    category: 'author',
+                    value: 'Ruth Chou Simons',
+                    percentageType: 'flat',
+                    percentage: 68,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31',
+                    note: 'Pilgrim'
+                },
+                {
+                    category: 'item_type',
+                    value: 'All Other',
+                    percentageType: 'flat',
+                    percentage: 70,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                }
+            ];
+
+            // Preset rules for Dayspring
+            const dayspringRules = [
+                {
+                    category: 'product_line',
+                    value: '2D Gifts',
+                    percentageType: 'additive',
+                    percentage: 8,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31',
+                    note: 'Day Brightners'
+                },
+                {
+                    category: 'product_line',
+                    value: '3D Gifts',
+                    percentageType: 'additive',
+                    percentage: 8,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31',
+                    note: 'Drinkware, Wall Décor, Kitchen'
+                },
+                {
+                    category: 'product_line',
+                    value: 'Bags',
+                    percentageType: 'additive',
+                    percentage: 8,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'product_line',
+                    value: 'Bibles',
+                    percentageType: 'additive',
+                    percentage: 8,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31',
+                    note: 'Bible Covers'
+                },
+                {
+                    category: 'product_line',
+                    value: 'Calendars',
+                    percentageType: 'additive',
+                    percentage: 5,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31',
+                    note: 'Dated, plus planners'
+                },
+                {
+                    category: 'product_line',
+                    value: 'Christmas Boxed Cards',
+                    percentageType: 'additive',
+                    percentage: 5,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'product_line',
+                    value: 'Christmas Gifts',
+                    percentageType: 'additive',
+                    percentage: 8,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31',
+                    note: 'Bags, SOTS, Gifts'
+                },
+                {
+                    category: 'product_line',
+                    value: 'Everyday Boxed Cards',
+                    percentageType: 'additive',
+                    percentage: 5,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'product_line',
+                    value: 'Everyday Counter Cards',
+                    percentageType: 'additive',
+                    percentage: 25,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'product_line',
+                    value: 'Flex Counter Cards',
+                    percentageType: 'additive',
+                    percentage: 30,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'product_line',
+                    value: 'Little Inspirations Counter Cards',
+                    percentageType: 'additive',
+                    percentage: 30,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'product_line',
+                    value: 'Publishing',
+                    percentageType: 'additive',
+                    percentage: 5,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31',
+                    note: 'Books, Journals'
+                },
+                {
+                    category: 'product_line',
+                    value: 'Seasonal Boxed Cards',
+                    percentageType: 'additive',
+                    percentage: 5,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'product_line',
+                    value: 'Seasonal Counter Cards',
+                    percentageType: 'additive',
+                    percentage: 30,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'product_line',
+                    value: 'Stand-Alone Counter Cards',
+                    percentageType: 'additive',
+                    percentage: 25,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'product_line',
+                    value: 'Stationary & Notes',
+                    percentageType: 'additive',
+                    percentage: 8,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                }
+            ];
+
+            // Preset rules for Swanson
+            const swansonRules = [
+                {
+                    category: 'item_type',
+                    value: 'All Items',
+                    percentageType: 'additive',
+                    percentage: 10,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31',
+                    note: 'Extra 10% off of Anchor\'s cost of goods'
+                }
+            ];
+
+            // Preset rules for Chosen LLC
+            const chosenRules = [
+                {
+                    category: 'item_type',
+                    value: 'All Items',
+                    percentageType: 'additive',
+                    percentage: 5,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                }
+            ];
+
+            // Preset rules for Pavilion
+            const pavilionRules = [
+                {
+                    category: 'item_type',
+                    value: 'All Items',
+                    percentageType: 'additive',
+                    percentage: 5,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                }
+            ];
+
+            // Preset rules for Dexsa Company
+            const dexsaRules = [
+                {
+                    category: 'item_type',
+                    value: 'All Items',
+                    percentageType: 'additive',
+                    percentage: 2.5,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                }
+            ];
+
+            // Preset rules for Dexterity
+            const dexterityRules = [
+                {
+                    category: 'item_type',
+                    value: 'All Items',
+                    percentageType: 'additive',
+                    percentage: 10,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                }
+            ];
+
+            // Preset rules for New Leaf Press
+            const newLeafPressRules = [
+                {
+                    category: 'item_type',
+                    value: 'All Items',
+                    percentageType: 'additive',
+                    percentage: 10,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                }
+            ];
+
+            // Preset rules for Barbour Publishing
+            const barbourRules = [
+                {
+                    category: 'item_type',
+                    value: 'All Items',
+                    percentageType: 'flat',
+                    percentage: 70,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                }
+            ];
+
+            // Preset rules for Broadstreet Publishing
+            const broadstreetRules = [
+                {
+                    category: 'item_type',
+                    value: 'All Items',
+                    percentageType: 'flat',
+                    percentage: 70,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                }
+            ];
+
+            // Preset rules for Christian Art Gifts
+            const christianArtRules = [
+                {
+                    category: 'item_type',
+                    value: 'All Items',
+                    percentageType: 'flat',
+                    percentage: 70,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                }
+            ];
+
+            // Preset rules for Crossway Books
+            const crosswayRules = [
+                {
+                    category: 'item_type',
+                    value: 'All Items',
+                    percentageType: 'flat',
+                    percentage: 70,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                }
+            ];
+
+            // Preset rules for Baker Publishing
+            const bakerRules = [
+                {
+                    category: 'item_type',
+                    value: 'All Items',
+                    percentageType: 'flat',
+                    percentage: 65,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'item_type',
+                    value: 'POD Titles',
+                    percentageType: 'flat',
+                    percentage: 50,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31',
+                    note: 'No WA BEC on POD titles (titles ending in $xx.00 and bought at 50% discount)'
+                }
+            ];
+
+            // Preset rules for Tyndale House
+            const tyndaleRules = [
+                {
+                    category: 'item_type',
+                    value: 'All Items',
+                    percentageType: 'flat',
+                    percentage: 65,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'item_numbers',
+                    value: '214990,214946,402758,371336,402771,371365,214934',
+                    percentageType: 'flat',
+                    percentage: 70,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31',
+                    note: '70% WA BEC on speedys'
+                }
+            ];
+
+            // Preset rules for Charisma Media
+            const charismaRules = [
+                {
+                    category: 'item_type',
+                    value: 'All Items',
+                    percentageType: 'flat',
+                    percentage: 65,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'item_numbers',
+                    value: '204693,392999,380445',
+                    percentageType: 'flat',
+                    percentage: 70,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31',
+                    note: '70% WA BEC on speedys'
+                }
+            ];
+
+            // Preset rules for APG Sales
+            const apgRules = [
+                {
+                    category: 'item_type',
+                    value: 'All Items',
+                    percentageType: 'flat',
+                    percentage: 65,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                }
+            ];
+
+            // Preset rules for Kregel Publications
+            const kregelRules = [
+                {
+                    category: 'item_type',
+                    value: 'All Items',
+                    percentageType: 'flat',
+                    percentage: 65,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                }
+            ];
+
+            // Preset rules for Longleaf Services
+            const longleafRules = [
+                {
+                    category: 'item_type',
+                    value: 'All Items',
+                    percentageType: 'flat',
+                    percentage: 65,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                }
+            ];
+
+            // Preset rules for Moody Publishing
+            const moodyRules = [
+                {
+                    category: 'item_type',
+                    value: 'All Items',
+                    percentageType: 'flat',
+                    percentage: 65,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                }
+            ];
+
+            // Preset rules for New Growth Press
+            const newGrowthRules = [
+                {
+                    category: 'item_type',
+                    value: 'All Items',
+                    percentageType: 'flat',
+                    percentage: 65,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                }
+            ];
+
+            // Preset rules for The Upper Room
+            const upperRoomRules = [
+                {
+                    category: 'item_type',
+                    value: 'All Items',
+                    percentageType: 'flat',
+                    percentage: 65,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                }
+            ];
+
+            // Preset rules for Abingdon Press
+            const abingdonRules = [
+                {
+                    category: 'item_type',
+                    value: 'All Items',
+                    percentageType: 'flat',
+                    percentage: 62,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'item_type',
+                    value: 'Dated Annuals',
+                    percentageType: 'additive',
+                    percentage: 12,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31',
+                    note: '12% credit/rebate on dated annuals (i.e. Prepare! 2023-2024 NRSVUE Edition)'
+                },
+                {
+                    category: 'item_type',
+                    value: 'CEB Bibles',
+                    percentageType: 'additive',
+                    percentage: 15,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31',
+                    note: '15% credit/rebate on CEB Bibles (normal buy disc = 50%)'
+                },
+                {
+                    category: 'item_type',
+                    value: 'VBS',
+                    percentageType: 'additive',
+                    percentage: 3,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31',
+                    note: '3% on VBS net sales (normal buy disc = 32%–42%)'
+                },
+                {
+                    category: 'item_type',
+                    value: 'Cups/Wafers',
+                    percentageType: 'additive',
+                    percentage: 5,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31'
+                },
+                {
+                    category: 'item_type',
+                    value: 'Curriculum',
+                    percentageType: 'flat',
+                    percentage: 0,
+                    startDate: '2024-01-01',
+                    endDate: '2024-12-31',
+                    note: 'No rebate on curriculum (look for Fall, Winter, Spring, or Summer in the title)'
+                }
+            ];
+
+            // Function to update vendor summary table
+            function updateVendorSummaryTable() {
+                const vendorSummaryTable = document.getElementById('vendorSummaryTable');
+                vendorSummaryTable.innerHTML = '';
+
+                vendors.forEach(vendor => {
+                    let defaultPercentage = 0;
+                    let ruleCount = 0;
+
+                    // Get vendor rules and default percentage
+                    switch(vendor.id) {
+                        case '4423': // Warner Press
+                            defaultPercentage = 55;
+                            ruleCount = warnerPressRules.length;
+                            break;
+                        case '201937': // B&H Publishing
+                            defaultPercentage = 0;
+                            ruleCount = bAndHRules.length;
+                            break;
+                        case '2987414': // David C Cook
+                            defaultPercentage = 51;
+                            ruleCount = davidCCookRules.length;
+                            break;
+                        case '2074745': // Harvest House
+                            defaultPercentage = 0;
+                            ruleCount = harvestHouseRules.length;
+                            break;
+                        case '2986302': // Dayspring
+                            defaultPercentage = 0;
+                            ruleCount = dayspringRules.length;
+                            break;
+                        case '2549378': // Swanson
+                            defaultPercentage = 0;
+                            ruleCount = swansonRules.length;
+                            break;
+                        case '2032332423': // Chosen LLC
+                            defaultPercentage = 0;
+                            ruleCount = chosenRules.length;
+                            break;
+                        case '2032332423': // Pavilion
+                            defaultPercentage = 0;
+                            ruleCount = pavilionRules.length;
+                            break;
+                        case '2032332423': // Dexsa Company
+                            defaultPercentage = 0;
+                            ruleCount = dexsaRules.length;
+                            break;
+                        case '6156692695': // Dexterity
+                            defaultPercentage = 0;
+                            ruleCount = dexterityRules.length;
+                            break;
+                        case '2079518': // New Leaf Press
+                            defaultPercentage = 0;
+                            ruleCount = newLeafPressRules.length;
+                            break;
+                        case '2957094': // Barbour Publishing
+                            defaultPercentage = 70;
+                            ruleCount = barbourRules.length;
+                            break;
+                        case '9902635': // Broadstreet Publishing
+                            defaultPercentage = 70;
+                            ruleCount = broadstreetRules.length;
+                            break;
+                        case '6305990240': // Christian Art Gifts
+                            defaultPercentage = 70;
+                            ruleCount = christianArtRules.length;
+                            break;
+                        case '2117991': // Crossway Books
+                            defaultPercentage = 70;
+                            ruleCount = crosswayRules.length;
+                            break;
+                        case '2991500': // Baker Publishing
+                            defaultPercentage = 65;
+                            ruleCount = bakerRules.length;
+                            break;
+                        case '2067749': // Tyndale House
+                            defaultPercentage = 65;
+                            ruleCount = tyndaleRules.length;
+                            break;
+                        case '6775640': // Charisma Media
+                            defaultPercentage = 65;
+                            ruleCount = charismaRules.length;
+                            break;
+                        case '2032332423': // APG Sales
+                            defaultPercentage = 65;
+                            ruleCount = apgRules.length;
+                            break;
+                        case '2989115': // Kregel Publications
+                            defaultPercentage = 65;
+                            ruleCount = kregelRules.length;
+                            break;
+                        case '2033151': // Longleaf Services
+                            defaultPercentage = 65;
+                            ruleCount = longleafRules.length;
+                            break;
+                        case '2025604': // Moody Publishing
+                            defaultPercentage = 65;
+                            ruleCount = moodyRules.length;
+                            break;
+                        case '3363120230': // New Growth Press
+                            defaultPercentage = 65;
+                            ruleCount = newGrowthRules.length;
+                            break;
+                        case '2032332423': // The Upper Room
+                            defaultPercentage = 65;
+                            ruleCount = upperRoomRules.length;
+                            break;
+                        case '2010054': // Abingdon Press
+                            defaultPercentage = 62;
+                            ruleCount = abingdonRules.length;
+                            break;
+                    }
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${vendor.name}</td>
+                        <td>${defaultPercentage}%</td>
+                        <td>${ruleCount}</td>
+                    `;
+                    vendorSummaryTable.appendChild(row);
+                });
+            }
+
+            // Update vendor summary table when the page loads
+            updateVendorSummaryTable();
+
+            // When vendor is selected, populate their rules
+            vendorSelect.addEventListener('change', function() {
+                // Clear existing rules
+                rulesContainer.innerHTML = '';
+                
+                if (this.value === '4423') { // Warner Press
+                    document.getElementById('vendorDefault').value = 55;
+                    warnerPressRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '201937') { // B&H Publishing
+                    document.getElementById('vendorDefault').value = 0;
+                    bAndHRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '2987414') { // David C Cook
+                    document.getElementById('vendorDefault').value = 51;
+                    davidCCookRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '2074745') { // Harvest House
+                    document.getElementById('vendorDefault').value = 0;
+                    harvestHouseRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '2986302') { // Dayspring
+                    document.getElementById('vendorDefault').value = 0;
+                    dayspringRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '2549378') { // Swanson
+                    document.getElementById('vendorDefault').value = 0;
+                    swansonRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '2032332423') { // Chosen LLC
+                    document.getElementById('vendorDefault').value = 0;
+                    chosenRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '2032332423') { // Pavilion
+                    document.getElementById('vendorDefault').value = 0;
+                    pavilionRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '2032332423') { // Dexsa Company
+                    document.getElementById('vendorDefault').value = 0;
+                    dexsaRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '6156692695') { // Dexterity
+                    document.getElementById('vendorDefault').value = 0;
+                    dexterityRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '2079518') { // New Leaf Press
+                    document.getElementById('vendorDefault').value = 0;
+                    newLeafPressRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '2957094') { // Barbour Publishing
+                    document.getElementById('vendorDefault').value = 70;
+                    barbourRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '9902635') { // Broadstreet Publishing
+                    document.getElementById('vendorDefault').value = 70;
+                    broadstreetRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '6305990240') { // Christian Art Gifts
+                    document.getElementById('vendorDefault').value = 70;
+                    christianArtRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '2117991') { // Crossway Books
+                    document.getElementById('vendorDefault').value = 70;
+                    crosswayRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '2991500') { // Baker Publishing
+                    document.getElementById('vendorDefault').value = 65;
+                    bakerRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '2067749') { // Tyndale House
+                    document.getElementById('vendorDefault').value = 65;
+                    tyndaleRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '6775640') { // Charisma Media
+                    document.getElementById('vendorDefault').value = 65;
+                    charismaRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '2032332423') { // APG Sales
+                    document.getElementById('vendorDefault').value = 65;
+                    apgRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '2989115') { // Kregel Publications
+                    document.getElementById('vendorDefault').value = 65;
+                    kregelRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '2033151') { // Longleaf Services
+                    document.getElementById('vendorDefault').value = 65;
+                    longleafRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '2025604') { // Moody Publishing
+                    document.getElementById('vendorDefault').value = 65;
+                    moodyRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '3363120230') { // New Growth Press
+                    document.getElementById('vendorDefault').value = 65;
+                    newGrowthRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '2032332423') { // The Upper Room
+                    document.getElementById('vendorDefault').value = 65;
+                    upperRoomRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                } else if (this.value === '2010054') { // Abingdon Press
+                    document.getElementById('vendorDefault').value = 62;
+                    abingdonRules.forEach(rule => {
+                        addRuleWithNote(rule);
+                    });
+                }
+            });
+
+            // Add sub-rule functionality
+            function addSubRule(ruleCard) {
+                const subRuleTemplate = document.getElementById('subRuleTemplate');
+                const subRuleClone = subRuleTemplate.content.cloneNode(true);
+                const subRuleElement = subRuleClone.querySelector('.sub-rule');
+                
+                // Add delete functionality
+                const deleteBtn = subRuleElement.querySelector('.delete-sub-rule');
+                deleteBtn.addEventListener('click', function() {
+                    const subRule = this.closest('.sub-rule');
+                    subRule.remove();
+                });
+
+                // Handle category change for publisher dropdown
+                const categorySelect = subRuleElement.querySelector('.category-select');
+                const valueInput = subRuleElement.querySelector('.value-input');
+                const publisherSelect = subRuleElement.querySelector('.publisher-select');
+                const specialSelect = subRuleElement.querySelector('.special-select');
+
+                categorySelect.addEventListener('change', function() {
+                    if (this.value === 'publisher') {
+                        valueInput.classList.add('d-none');
+                        publisherSelect.classList.remove('d-none');
+                        specialSelect.classList.add('d-none');
+                        
+                        // Populate publisher dropdown
+                        publisherSelect.innerHTML = '<option value="">Select a publisher...</option>';
+                        publishers.forEach(publisher => {
+                            const option = document.createElement('option');
+                            option.value = publisher.name;
+                            option.textContent = publisher.name;
+                            publisherSelect.appendChild(option);
+                        });
+                    } else if (this.value === 'special') {
+                        valueInput.classList.add('d-none');
+                        publisherSelect.classList.add('d-none');
+                        specialSelect.classList.remove('d-none');
+                    } else {
+                        valueInput.classList.remove('d-none');
+                        publisherSelect.classList.add('d-none');
+                        specialSelect.classList.add('d-none');
+                    }
+                });
+
+                ruleCard.querySelector('.rule-conditions').appendChild(subRuleElement);
+            }
+
+            // Modify addRuleBtn event listener
+            addRuleBtn.addEventListener('click', function() {
+                const ruleClone = ruleTemplate.content.cloneNode(true);
+                const ruleCard = ruleClone.querySelector('.rule-card');
+                const deleteBtn = ruleCard.querySelector('.delete-rule');
+                const addSubRuleBtn = ruleCard.querySelector('.add-sub-rule-btn');
+                const viewMatchingBtn = ruleCard.querySelector('.view-matching-items');
+                
+                deleteBtn.addEventListener('click', function() {
+                    this.closest('.rule-card').remove();
+                });
+
+                addSubRuleBtn.addEventListener('click', function() {
+                    addSubRule(ruleCard);
+                });
+
+                viewMatchingBtn.addEventListener('click', function() {
+                    const ruleCard = this.closest('.rule-card');
+                    const category = ruleCard.querySelector('.category-select').value;
+                    const value = category === 'publisher' 
+                        ? ruleCard.querySelector('.publisher-select').value 
+                        : ruleCard.querySelector('.value-input').value;
+                    
+                    // Mock matching items data - replace with actual API call
+                    const mockItems = [
+                        { 
+                            itemSeqId: '12345', 
+                            title: 'Sample Item 1', 
+                            category: value, 
+                            type: 'Book', 
+                            speedy: 'Yes',
+                            isbn13: '9781234567890',
+                            upc: '123456789012',
+                            price: '$19.99',
+                            matchingRules: ['Publisher: Warner Press', 'Bible Version: ESV']
+                        },
+                        { 
+                            itemSeqId: '67890', 
+                            title: 'Sample Item 2', 
+                            category: value, 
+                            type: 'Book', 
+                            speedy: 'No',
+                            isbn13: '9780987654321',
+                            upc: '987654321098',
+                            price: '$24.99',
+                            matchingRules: ['Publisher: Warner Press']
+                        }
+                    ];
+
+                    // Function to update matching items table
+                    function updateMatchingItemsTable(items, page = 1, searchTerm = '') {
+                        const itemsPerPage = 10;
+                        const filteredItems = items.filter(item => {
+                            if (!searchTerm) return true;
+                            const searchLower = searchTerm.toLowerCase();
+                            return Object.values(item).some(value => 
+                                String(value).toLowerCase().includes(searchLower)
+                            );
+                        });
+
+                        const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
+                        const startIndex = (page - 1) * itemsPerPage;
+                        const endIndex = startIndex + itemsPerPage;
+                        const paginatedItems = filteredItems.slice(startIndex, endIndex);
+
+                        // Clear and populate the table
+                        matchingItemsTableBody.innerHTML = '';
+                        paginatedItems.forEach(item => {
+                            const row = document.createElement('tr');
+                            if (item.matchingRules && item.matchingRules.length > 1) {
+                                row.classList.add('rule-match');
+                            }
+                            row.innerHTML = `
+                                <td>${item.itemSeqId}</td>
+                                <td>${item.title}</td>
+                                <td>${item.category}</td>
+                                <td>${item.type}</td>
+                                <td>${item.speedy}</td>
+                                <td>${item.isbn13}</td>
+                                <td>${item.upc}</td>
+                                <td>${item.price}</td>
+                                <td>${item.matchingRules ? item.matchingRules.join(', ') : ''}</td>
+                            `;
+                            matchingItemsTableBody.appendChild(row);
+                        });
+
+                        // Update pagination
+                        const pagination = document.getElementById('matchingItemsPagination');
+                        pagination.innerHTML = '';
+
+                        // Previous button
+                        const prevLi = document.createElement('li');
+                        prevLi.className = `page-item ${page === 1 ? 'disabled' : ''}`;
+                        prevLi.innerHTML = `<a class="page-link" href="#" data-page="${page - 1}">Previous</a>`;
+                        pagination.appendChild(prevLi);
+
+                        // Page numbers
+                        for (let i = 1; i <= totalPages; i++) {
+                            const li = document.createElement('li');
+                            li.className = `page-item ${i === page ? 'active' : ''}`;
+                            li.innerHTML = `<a class="page-link" href="#" data-page="${i}">${i}</a>`;
+                            pagination.appendChild(li);
+                        }
+
+                        // Next button
+                        const nextLi = document.createElement('li');
+                        nextLi.className = `page-item ${page === totalPages ? 'disabled' : ''}`;
+                        nextLi.innerHTML = `<a class="page-link" href="#" data-page="${page + 1}">Next</a>`;
+                        pagination.appendChild(nextLi);
+
+                        // Add click handlers for pagination
+                        pagination.querySelectorAll('.page-link').forEach(link => {
+                            link.addEventListener('click', (e) => {
+                                e.preventDefault();
+                                const newPage = parseInt(e.target.dataset.page);
+                                if (!isNaN(newPage) && newPage >= 1 && newPage <= totalPages) {
+                                    updateMatchingItemsTable(items, newPage, searchTerm);
+                                }
+                            });
+                        });
+                    }
+
+                    // Add search functionality
+                    const matchingItemsSearch = document.getElementById('matchingItemsSearch');
+                    matchingItemsSearch.addEventListener('input', (e) => {
+                        updateMatchingItemsTable(mockItems, 1, e.target.value);
+                    });
+
+                    // Update view matching items functionality
+                    viewMatchingBtn.addEventListener('click', function() {
+                        const ruleCard = this.closest('.rule-card');
+                        const category = ruleCard.querySelector('.category-select').value;
+                        const value = category === 'publisher' 
+                            ? ruleCard.querySelector('.publisher-select').value 
+                            : ruleCard.querySelector('.value-input').value;
+                        
+                        // Show the modal
+                        matchingItemsModal.show();
+                        
+                        // Update the table with initial data
+                        updateMatchingItemsTable(mockItems);
+                    });
+
+                    matchingItemsModal.show();
+                });
+
+                rulesContainer.appendChild(ruleCard);
+            });
+
+            // Modify addRuleWithNote function to handle sub-rules
+            function addRuleWithNote(rule) {
+                const ruleClone = ruleTemplate.content.cloneNode(true);
+                const ruleCard = ruleClone.querySelector('.rule-card');
+                
+                // Set main rule values
+                const mainCondition = ruleCard.querySelector('.rule-condition');
+                mainCondition.querySelector('.category-select').value = rule.category;
+                mainCondition.querySelector('.value-input').value = rule.value;
+                
+                // Handle category-specific inputs
+                if (rule.category === 'publisher') {
+                    mainCondition.querySelector('.value-input').classList.add('d-none');
+                    const publisherSelect = mainCondition.querySelector('.publisher-select');
+                    publisherSelect.classList.remove('d-none');
+                    publisherSelect.value = rule.value;
+                } else if (rule.category === 'special') {
+                    mainCondition.querySelector('.value-input').classList.add('d-none');
+                    const specialSelect = mainCondition.querySelector('.special-select');
+                    specialSelect.classList.remove('d-none');
+                    specialSelect.value = rule.value;
+                }
+
+                // Set other rule values
+                ruleCard.querySelector('.percentage-type').value = rule.percentageType;
+                ruleCard.querySelector('.percentage-input').value = rule.percentage;
+                ruleCard.querySelector('.start-date').value = rule.startDate;
+                ruleCard.querySelector('.end-date').value = rule.endDate;
+                
+                // Add sub-rules if they exist
+                if (rule.subRules) {
+                    rule.subRules.forEach(subRule => {
+                        addSubRule(ruleCard);
+                        const subRuleElement = ruleCard.querySelector('.sub-rule:last-child');
+                        subRuleElement.querySelector('.category-select').value = subRule.category;
+                        subRuleElement.querySelector('.value-input').value = subRule.value;
+                        subRuleElement.querySelector('.operator-select').value = subRule.operator;
+                    });
+                }
+                
+                // Add note if present
+                if (rule.note) {
+                    const noteDiv = document.createElement('div');
+                    noteDiv.className = 'mt-2 text-muted';
+                    noteDiv.textContent = rule.note;
+                    ruleCard.querySelector('.row').after(noteDiv);
+                }
+                
+                // Add delete button functionality
+                const deleteBtn = ruleCard.querySelector('.delete-rule');
+                deleteBtn.addEventListener('click', function() {
+                    this.closest('.rule-card').remove();
+                });
+
+                // Add sub-rule button functionality
+                const addSubRuleBtn = ruleCard.querySelector('.add-sub-rule-btn');
+                addSubRuleBtn.addEventListener('click', function() {
+                    addSubRule(ruleCard);
+                });
+                
+                rulesContainer.appendChild(ruleCard);
+            }
+
+            // Export to Excel functionality
+            exportExcelBtn.addEventListener('click', function() {
+                // Create workbook
+                const wb = XLSX.utils.book_new();
+                
+                // Create vendor rules sheet
+                const vendorRulesData = [];
+                
+                // Add headers
+                vendorRulesData.push([
+                    'Vendor ID',
+                    'Vendor Name',
+                    'Default Percentage',
+                    'Category',
+                    'Value',
+                    'Percentage Type',
+                    'Percentage',
+                    'Start Date',
+                    'End Date',
+                    'Notes'
+                ]);
+
+                // Add data for each vendor
+                vendors.forEach(vendor => {
+                    let rules = [];
+                    let defaultPercentage = 0;
+
+                    // Get vendor rules and default percentage
+                    switch(vendor.id) {
+                        case '4423': // Warner Press
+                            rules = warnerPressRules;
+                            defaultPercentage = 55;
+                            break;
+                        case '201937': // B&H Publishing
+                            rules = bAndHRules;
+                            defaultPercentage = 0;
+                            break;
+                        case '2987414': // David C Cook
+                            rules = davidCCookRules;
+                            defaultPercentage = 51;
+                            break;
+                        case '2074745': // Harvest House
+                            rules = harvestHouseRules;
+                            defaultPercentage = 0;
+                            break;
+                        case '2986302': // Dayspring
+                            rules = dayspringRules;
+                            defaultPercentage = 0;
+                            break;
+                        case '2549378': // Swanson
+                            rules = swansonRules;
+                            defaultPercentage = 0;
+                            break;
+                        case '2032332423': // Chosen LLC
+                            rules = chosenRules;
+                            defaultPercentage = 0;
+                            break;
+                        case '2032332423': // Pavilion
+                            rules = pavilionRules;
+                            defaultPercentage = 0;
+                            break;
+                        case '2032332423': // Dexsa Company
+                            rules = dexsaRules;
+                            defaultPercentage = 0;
+                            break;
+                        case '6156692695': // Dexterity
+                            rules = dexterityRules;
+                            defaultPercentage = 0;
+                            break;
+                        case '2079518': // New Leaf Press
+                            rules = newLeafPressRules;
+                            defaultPercentage = 0;
+                            break;
+                        case '2957094': // Barbour Publishing
+                            rules = barbourRules;
+                            defaultPercentage = 70;
+                            break;
+                        case '9902635': // Broadstreet Publishing
+                            rules = broadstreetRules;
+                            defaultPercentage = 70;
+                            break;
+                        case '6305990240': // Christian Art Gifts
+                            rules = christianArtRules;
+                            defaultPercentage = 70;
+                            break;
+                        case '2117991': // Crossway Books
+                            rules = crosswayRules;
+                            defaultPercentage = 70;
+                            break;
+                        case '2991500': // Baker Publishing
+                            rules = bakerRules;
+                            defaultPercentage = 65;
+                            break;
+                        case '2067749': // Tyndale House
+                            rules = tyndaleRules;
+                            defaultPercentage = 65;
+                            break;
+                        case '6775640': // Charisma Media
+                            rules = charismaRules;
+                            defaultPercentage = 65;
+                            break;
+                        case '2032332423': // APG Sales
+                            rules = apgRules;
+                            defaultPercentage = 65;
+                            break;
+                        case '2989115': // Kregel Publications
+                            rules = kregelRules;
+                            defaultPercentage = 65;
+                            break;
+                        case '2033151': // Longleaf Services
+                            rules = longleafRules;
+                            defaultPercentage = 65;
+                            break;
+                        case '2025604': // Moody Publishing
+                            rules = moodyRules;
+                            defaultPercentage = 65;
+                            break;
+                        case '3363120230': // New Growth Press
+                            rules = newGrowthRules;
+                            defaultPercentage = 65;
+                            break;
+                        case '2032332423': // The Upper Room
+                            rules = upperRoomRules;
+                            defaultPercentage = 65;
+                            break;
+                        case '2010054': // Abingdon Press
+                            rules = abingdonRules;
+                            defaultPercentage = 62;
+                            break;
+                    }
+
+                    // Add vendor rules to data
+                    if (rules.length === 0) {
+                        vendorRulesData.push([
+                            vendor.id,
+                            vendor.name,
+                            defaultPercentage,
+                            'All Items',
+                            'All Items',
+                            'flat',
+                            defaultPercentage,
+                            '2024-01-01',
+                            '2024-12-31',
+                            ''
+                        ]);
+                    } else {
+                        rules.forEach(rule => {
+                            vendorRulesData.push([
+                                vendor.id,
+                                vendor.name,
+                                defaultPercentage,
+                                rule.category,
+                                rule.value,
+                                rule.percentageType,
+                                rule.percentage,
+                                rule.startDate,
+                                rule.endDate,
+                                rule.note || ''
+                            ]);
+                        });
+                    }
+                });
+
+                // Create worksheet
+                const ws = XLSX.utils.aoa_to_sheet(vendorRulesData);
+
+                // Add worksheet to workbook
+                XLSX.utils.book_append_sheet(wb, ws, "Vendor Rules");
+
+                // Create categories sheet
+                const categoriesData = [
+                    ['Category', 'Description'],
+                    ['bible_translations', 'Bible Translations'],
+                    ['item_type', 'Item Type'],
+                    ['title_keywords', 'Title Key Words'],
+                    ['item_seq_id', 'Item_Seq_ID'],
+                    ['speedy', 'Speedy'],
+                    ['isbn_13', 'ISBN-13'],
+                    ['upc', 'UPC'],
+                    ['catalog_sections', 'Catalog Sections'],
+                    ['categories', 'Categories'],
+                    ['publisher', 'Publisher'],
+                    ['bible_version', 'Bible Version'],
+                    ['author', 'Author'],
+                ];
+
+                const categoriesWs = XLSX.utils.aoa_to_sheet(categoriesData);
+                XLSX.utils.book_append_sheet(wb, categoriesWs, "Categories");
+
+                // Save file
+                XLSX.writeFile(wb, "vendor_pricing_rules.xlsx");
+            });
+
+            // Function to get all current rules
+            function getAllCurrentRules() {
+                const rules = [];
+                const ruleCards = document.querySelectorAll('.rule-card');
+                
+                ruleCards.forEach(card => {
+                    const rule = {
+                        category: card.querySelector('.category-select').value,
+                        value: card.querySelector('.category-select').value === 'publisher' 
+                            ? card.querySelector('.publisher-select').value 
+                            : card.querySelector('.value-input').value,
+                        percentageType: card.querySelector('.percentage-type').value,
+                        percentage: parseFloat(card.querySelector('.percentage-input').value),
+                        startDate: card.querySelector('.start-date').value,
+                        endDate: card.querySelector('.end-date').value,
+                        vendorDiscount: parseFloat(card.querySelector('.vendor-discount-display').textContent)
+                    };
+                    
+                    // Add note if present
+                    const noteDiv = card.querySelector('.text-muted');
+                    if (noteDiv) {
+                        rule.note = noteDiv.textContent;
+                    }
+                    
+                    rules.push(rule);
+                });
+                
+                return {
+                    vendorId: vendorSelect.value,
+                    vendorName: vendorSelect.options[vendorSelect.selectedIndex].text,
+                    defaultPercentage: parseFloat(document.getElementById('vendorDefault').value),
+                    rules: rules
+                };
+            }
+
+            // Save rules functionality
+            saveRulesBtn.addEventListener('click', function() {
+                // Show success message
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 end-0 m-3';
+                alertDiv.innerHTML = `
+                    Rules saved successfully!
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                document.body.appendChild(alertDiv);
+                
+                // Remove alert after 3 seconds
+                setTimeout(() => {
+                    alertDiv.remove();
+                }, 3000);
+            });
+
+            // Add event listeners for showing/hiding vendor summary
+            document.getElementById('showVendorSummary').addEventListener('click', function() {
+                document.getElementById('vendorSummaryCard').style.display = 'block';
+                this.style.display = 'none';
+            });
+
+            document.getElementById('hideVendorSummary').addEventListener('click', function() {
+                document.getElementById('vendorSummaryCard').style.display = 'none';
+                document.getElementById('showVendorSummary').style.display = 'block';
+            });
+
+            // Version History Modal
+            const versionHistoryModal = new bootstrap.Modal(document.getElementById('versionHistoryModal'));
+            document.getElementById('showVersionHistory').addEventListener('click', function() {
+                versionHistoryModal.show();
+            });
+        });
+    </script>
+</body>
+</html> 
